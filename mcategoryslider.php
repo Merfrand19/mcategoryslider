@@ -28,7 +28,20 @@
                 && $this->registerHook('actionFrontControllerSetMedia'); ;
         }
 
-        public function uninstall() {
+        public function uninstall()
+        {
+            $num_categories = (int) Configuration::get('MCATEGORIES_NUMBER');
+            Configuration::deleteByName('MCATEGORIES_NUMBER');
+            for ($i = 1; $i <= $num_categories; $i++) {
+                Configuration::deleteByName('CATEGORY_IMAGE_' . $i);
+            }
+            $upload_dir = _PS_MODULE_DIR_ . 'mcategoryslider/images/';
+            for ($i = 1; $i <= $num_categories; $i++) {
+                $image_path = $upload_dir . 'category_' . $i . '.jpg';
+                if (file_exists($image_path)) {
+                    unlink($image_path); // Supprime l'image si elle existe
+                }
+            }
             return parent::uninstall();
         }
 
@@ -100,74 +113,75 @@
         }
         
 
-public function hookDisplayHome($params)
-{
-    $categories = [];
-    $id_lang = (int)Context::getContext()->language->id;
-    $categoryObjects = Category::getCategories($id_lang, true, false);
+        public function hookDisplayHome($params)
+        {
+            $categories = [];
+            $id_lang = (int)Context::getContext()->language->id;
+            $categoryObjects = Category::getCategories($id_lang, true, false);
 
-    // Définir le nombre de catégories à afficher depuis la configuration
-    $num_categories = (int)Configuration::get('MCATEGORIES_NUMBER');
+            // Définir le nombre de catégories à afficher depuis la configuration
+            $num_categories = (int)Configuration::get('MCATEGORIES_NUMBER');
 
-    // Définir le chemin de l'image par défaut
-    $defaultImage = $this->_path . 'images/default_img.jpg'; // Image par défaut
+            // Définir le chemin de l'image par défaut
+            $defaultImage = $this->_path . 'images/default_img.jpg'; // Image par défaut
 
-    $count = 0; // Compteur pour limiter le nombre de catégories affichées
+            $count = 0; // Compteur pour limiter le nombre de catégories affichées
 
-    foreach ($categoryObjects as $category) {
-        if (!isset($category['id_category']) || !isset($category['name'])) {
-            continue;
-        }
+            foreach ($categoryObjects as $category) {
+                if (!isset($category['id_category']) || !isset($category['name'])) {
+                    continue;
+                }
 
-        // Exclure les catégories "Racine" (ID 1) et "Accueil" (ID 2)
-        if ($category['id_category'] == 1 || $category['id_category'] == 2) {
-            continue;
-        }
+                // Exclure les catégories "Racine" (ID 1) et "Accueil" (ID 2)
+                if ($category['id_category'] == 1 || $category['id_category'] == 2) {
+                    continue;
+                }
 
-        $categoryId = (int) $category['id_category'];
-        $categoryParentId = (int) $category['id_parent'];
-        $categoryLink = Context::getContext()->link->getCategoryLink($categoryId);
+                $categoryId = (int) $category['id_category'];
+                $categoryParentId = (int) $category['id_parent'];
+                $categoryLink = Context::getContext()->link->getCategoryLink($categoryId);
 
-        // Récupérer l'image depuis la configuration
-        $imagePath = Configuration::get('CATEGORY_IMAGE_' . $count + 1);
+                // Récupérer l'image depuis la configuration
+                $imagePath = Configuration::get('CATEGORY_IMAGE_' . $count + 1);
 
-        if ($imagePath) {
-            $imagePath = preg_replace('/^.*\/modules\//', '/modules/', $imagePath);
-        } else {
-            $imagePath = $defaultImage;
-        }
+                if ($imagePath) {
+                    $imagePath = preg_replace('/^.*\/modules\//', '/modules/', $imagePath);
+                } else {
+                    $imagePath = $defaultImage;
+                }
 
-        // Récupérer le nom du parent
-        $parentName = 'Root'; // Valeur par défaut pour les catégories sans parent
-        if ($categoryParentId > 0) {
-            $parentCategory = new Category($categoryParentId, $id_lang);
-            if (Validate::isLoadedObject($parentCategory)) {
-                $parentName = $parentCategory->name;
+                // Récupérer le nom du parent
+                $parentName = 'Root'; // Valeur par défaut pour les catégories sans parent
+                if ($categoryParentId > 0) {
+                    $parentCategory = new Category($categoryParentId, $id_lang);
+                    if (Validate::isLoadedObject($parentCategory)) {
+                        $parentName = $parentCategory->name;
+                    }
+                }
+
+                // Ajouter la catégorie au tableau
+                $categories[] = [
+                    'name' => $category['name'],
+                    'link' => $categoryLink,
+                    'image' => $imagePath,
+                    'parent' => $parentName,
+                ];
+
+                $count++;
+
+                // Stopper la boucle si le nombre max de catégories est atteint
+                if ($count >= $num_categories) {
+                    break;
+                }
             }
+
+            // Assigner les catégories à Smarty
+            $this->context->smarty->assign('categories', $categories);
+
+            // Retourner le rendu du template
+            return $this->display(__FILE__, 'mcategoryslider.tpl');
         }
 
-        // Ajouter la catégorie au tableau
-        $categories[] = [
-            'name' => $category['name'],
-            'link' => $categoryLink,
-            'image' => $imagePath,
-            'parent' => $parentName,
-        ];
-
-        $count++;
-
-        // Stopper la boucle si le nombre max de catégories est atteint
-        if ($count >= $num_categories) {
-            break;
-        }
-    }
-
-    // Assigner les catégories à Smarty
-    $this->context->smarty->assign('categories', $categories);
-
-    // Retourner le rendu du template
-    return $this->display(__FILE__, 'mcategoryslider.tpl');
-}
 
 
 
